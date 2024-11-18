@@ -1,7 +1,6 @@
-
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     nixpkgs_master.url = "github:NixOS/nixpkgs/master";
     systems.url = "github:nix-systems/default";
     devenv.url = "github:cachix/devenv";
@@ -50,8 +49,7 @@
                   # https://devenv.sh/reference/options/
                   packages = with pkgs; [
                     poetry
-                    ruff
-                    python310
+                    isort
                   ];
                   enterShell = ''
                     export LD_LIBRARY_PATH=$NIX_LD_LIBRARY_PATH
@@ -59,6 +57,7 @@
                     if [ ! -d ".venv" ]; then
                        poetry install -vv --with dev
                     fi
+                    ln -sf ${pkgs.ruff}/bin/ruff .venv/bin/ruff
                     source .venv/bin/activate
                   '';
                 }
