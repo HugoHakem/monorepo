@@ -26,6 +26,7 @@ import cupy as cp
 import cupyx.scipy.spatial as spatial
 import numpy as np
 import polars as pl
+import polars.selectors as cs
 from jump_rr.concensus import (
     get_concensus_meta_urls,
     get_cycles,
@@ -38,13 +39,14 @@ from jump_rr.replicability import add_replicability
 from jump_rr.synonyms import get_synonym_mapper
 from jump_rr.translate import get_mappers
 
+from jump_rr.datasets import get_dataset
+
 assert cp.cuda.get_current_stream().done, "GPU not available"
 
 # %% Setup
 ## Paths
-dir_path = Path("/datastore/shared/morphmap_profiles/")
-datasets = ("crispr", "orf")
 output_dir = Path("./databases")
+datasets = ("crispr", "orf")
 
 ## Parameters
 n_vals_used = 25  # Number of top and bottom matches used
@@ -66,25 +68,24 @@ ext_links_col = f"{match_col} resources"  # Link to external resources (e.g., NC
 # HTML formatters
 img_formatter = '{{"img_src": {}, "href": {}, "width": 200}}'
 
+
 # %% Processing starts
 for dset in datasets:
-    profiles_path = dir_path / f"{dset}.parquet"
-
     # %% Load Metadata
     print(dset)
-    df = pl.read_parquet(profiles_path)
+    df = pl.read_parquet(get_dataset(dset))
 
     # %% add build url from individual wells
     med, _, urls = get_concensus_meta_urls(df, url_colname="Metadata_placeholder")
     urls = urls.rename({"Metadata_placeholder": url_col})
 
-    vals = cp.array(med.select(pl.all().exclude("^Metadata.*$")).to_numpy())
+    vals = cp.array(med.select(cs.by_dtype(pl.Float32)).to_numpy())
 
     # %% Calculate cosine distance
-    cosine_sim = spatial.distance.cdist(vals, vals, metric="cosine")
+    cosine_dist = spatial.distance.cdist(vals, vals, metric="cosine")
 
     # Get most correlated and anticorrelated indices
-    xs, ys = get_bottom_top_indices(cosine_sim, n_vals_used, skip_first=True)
+    xs, ys = get_bottom_top_indices(cosine_dist, n_vals_used, skip_first=True)
 
     # Build a dataframe containing matches
     jcp_ids = urls.select(pl.col(jcp_col)).to_series().to_numpy().astype("<U15")
@@ -96,7 +97,7 @@ for dset in datasets:
         {
             jcp_short: np.repeat(jcp_ids, n_vals_used * 2),
             match_jcp_col: jcp_ids[ys].astype("<U15"),
-            dist_col: cosine_sim[xs, ys].get(),
+            dist_col: cosine_dist[xs, ys].get(),
             url_col: [  # Secuentially produce multiple images
                 format_val("img", (img_src, img_src))
                 for x in url_vals
@@ -169,7 +170,7 @@ for dset in datasets:
 
     write_metadata(dset, "matches", (*order, "(*)"))
 
-    # Save cosine similarity matrix with JCP IDS
+    # Save cosine distance matrix with JCP IDS
     pl.DataFrame(
-        data=cosine_sim.get(), schema=med.get_column("Metadata_JCP2022").to_list()
+        data=cosine_dist.get(), schema=med.get_column("Metadata_JCP2022").to_list()
     ).write_parquet(output_dir / f"{dset}_cosinesim_full.parquet")

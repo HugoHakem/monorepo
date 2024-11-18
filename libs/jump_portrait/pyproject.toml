@@ -20,6 +20,7 @@ tqdm = "^4.66.1"
 s3fs = "^2024.6.0"
 numpy = "^2.1.2"
 
+
 [tool.poetry.group.dev.dependencies]
 jupyter = "^1.0.0"
 jupytext = "^1.15.0"
@@ -32,6 +33,3 @@ ipdb = "^0.13.13"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.ruff]
-select = ["ANN", "C90", "D", "E", "F", "I", "N", "NPY", "PTH", "TID", "UP", "W"]
-exclude = ["vendor"]

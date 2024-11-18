@@ -27,6 +27,10 @@
               system = system;
               config.allowUnfree = true;
             };
+            mpkgs = import inputs.nixpkgs_master {
+              system = system;
+              config.allowUnfree = true;
+            };
 
           in
             {
@@ -41,23 +45,24 @@
                   cudaPackages.cudatoolkit
                   #linuxPackages.nvidia_x11
                   pkgs.libz # for numpy
-                  pkgs.stdenv.cc.cc
+                  mpkgs.stdenv.cc.cc
                   pkgs.libGL
                   ]);
                   # https://devenv.sh/reference/options/
                   packages = with pkgs; [
                     poetry
-                    python310
-                    python310Packages.cupy
+                    python311Packages.cupy
                     csvtool
                   ];
                   enterShell = ''
                     export LD_LIBRARY_PATH=$NIX_LD_LIBRARY_PATH:${pkgs.cudatoolkit}
                     # export CUDA_PATH=${pkgs.cudaPackages.cudatoolkit}
+
                     export PYTHON_KEYRING_BACKEND=keyring.backends.fail.Keyring
                     if [ ! -d ".venv" ]; then
                        poetry install -vv --with dev
                     fi
+                    ln -sf ${pkgs.ruff}/bin/ruff .venv/bin/ruff
                     source .venv/bin/activate
                   '';
                 }
